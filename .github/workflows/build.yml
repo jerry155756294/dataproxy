@@ -1,4 +1,4 @@
-name: Build debug APK
+name: Build APK (debug + optimized arm64 release)
 
 on:
   push:
@@ -6,46 +6,64 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: dataproxy-build-${ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # android-actions/setup-android@v3 shells out to `sdkmanager tools`,
-      # a package Google dropped from the SDK repository; that now fails
-      # outright before anything Android-related runs. ubuntu-latest already
-      # ships an SDK (ANDROID_HOME set, cmdline-tools present), so just
-      # accept its licenses and let AGP fetch platform-36 / build-tools on
-      # demand during the build, same as a local machine with SDK licenses
-      # already accepted.
+      - name: Cache Gradle distribution and dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/gradle-8.10.2
+          key: gradle-${ runner.os }}-8.10.2-${ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${ runner.os }}-8.10.2-
+
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
 
-      # gradle/actions/setup-gradle@v4's own provisioning step fails here
-      # with no diagnostic output (just "process '/usr/bin/gradle' failed"),
-      # so install the exact version the project builds with (per CLAUDE.md)
-      # directly rather than fight the action's opaque failure.
-      - name: Install Gradle 8.10.2
+      - name: Install Gradle 8.10.2 unless cached
         run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.10.2-bin.zip
-          unzip -q gradle-8.10.2-bin.zip -d "$HOME"
+          if [ ! -x "$HOME/gradle-8.10.2/bin/gradle" ]; then
+            wget -q https://services.gradle.org/distributions/gradle-8.10.2-bin.zip
+            unzip -q gradle-8.10.2-bin.zip -d "$HOME"
+          fi
           echo "$HOME/gradle-8.10.2/bin" >> "$GITHUB_PATH"
 
-      # gradle.properties pins org.gradle.java.home to the maintainer's own
-      # local JBR path (/opt/android-studio/jbr), which doesn't exist here.
-      # Override it on the command line rather than edit the shared file,
-      # command-line -D wins over gradle.properties and this only affects CI.
-      - name: Assemble debug APK
-        run: gradle :app:assembleDebug --no-daemon --console=plain -Dorg.gradle.java.home="$JAVA_HOME"
+      - name: Run JVM tests and build debug + minified release
+        run: >
+          gradle :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
+          --build-cache --no-daemon --console=plain
+          -Dorg.gradle.java.home="$JAVA_HOME"
 
-      - uses: actions/upload-artifact@v4
+      - name: APK sizes
+        run: du -h app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
         with:
           name: dataproxy-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload minified arm64 release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataproxy-arm64-minified-release-apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error

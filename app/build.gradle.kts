@@ -15,6 +15,10 @@ android {
         versionCode = 9
         versionName = "1.4"
 
+        // Only arm64 native libraries, if dependencies ship any.
+        ndk { abiFilters += "arm64-v8a" }
+        resourceConfigurations += "en"
+
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -41,6 +45,9 @@ android {
             isShrinkResources = true
             if (keystoreFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
+            } else if (System.getenv("GITHUB_ACTIONS") == "true") {
+                // Installable CI build. A persistent keystore is needed for upgrades.
+                signingConfig = signingConfigs.getByName("debug")
             }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -89,4 +96,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.ui.tooling)
+    testImplementation("junit:junit:4.13.2")
 }
