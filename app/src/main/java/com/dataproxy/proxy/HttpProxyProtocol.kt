@@ -139,7 +139,8 @@ internal object HttpProxyProtocol {
         if (request.target.port != 80) out.append(':').append(request.target.port)
         out.append("\r\n")
         for ((key, value) in request.headers) {
-            if (key.lowercase() !in exclude) {
+            if (key.lowercase() in setOf("content-length", "transfer-encoding") ||
+                key.lowercase() !in exclude) {
                 out.append(key).append(": ").append(value).append("\r\n")
             }
         }

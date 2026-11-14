@@ -146,12 +146,12 @@ class HttpProxyConnection(
     private suspend fun tunnel(input: InputStream, output: OutputStream, remote: Socket) =
         coroutineScope {
             val up = launch(RelayDispatcher) {
-                copyStream(input, remote.getOutputStream()) { n ->
+                copyStream(input, remote.getOutputStream(), remote) { n ->
                     entry?.let { registry.recordUp(it, n) }
                 }
             }
             val down = launch(RelayDispatcher) {
-                copyStream(remote.getInputStream(), output) { n ->
+                copyStream(remote.getInputStream(), output, clientSocket) { n ->
                     entry?.let { registry.recordDown(it, n) }
                 }
             }
@@ -179,7 +179,7 @@ class HttpProxyConnection(
             }
         }
         val download = launch(RelayDispatcher) {
-            copyStream(remote.getInputStream(), output) { n ->
+            copyStream(remote.getInputStream(), output, clientSocket) { n ->
                 responseStarted = true
                 entry?.let { registry.recordDown(it, n) }
             }
@@ -264,7 +264,7 @@ class HttpProxyConnection(
         }
     }
 
-    private fun copyStream(input: InputStream, output: OutputStream, count: (Int) -> Unit) {
+    private fun copyStream(input: InputStream, output: OutputStream, sinkSocket: Socket, count: (Int) -> Unit) {
         val buf = ByteArray(BUFFER_SIZE)
         try {
             while (true) {
@@ -280,11 +280,7 @@ class HttpProxyConnection(
         } finally {
             runCatching { output.flush() }
             // Half-close the destination stream without killing reverse traffic.
-            if (output === upstream?.getOutputStream()) {
-                runCatching { upstream?.shutdownOutput() }
-            } else {
-                runCatching { clientSocket.shutdownOutput() }
-            }
+            runCatching { if (!sinkSocket.isOutputShutdown) sinkSocket.shutdownOutput() }
         }
     }
 
