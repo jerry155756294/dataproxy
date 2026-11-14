@@ -373,7 +373,7 @@ class ProxyService : Service() {
             NetworkMode.AUTO -> "Auto"
         }
         val sub = if (isPaused) (_state.value as? State.Paused)?.reason ?: "Network unavailable"
-        else "$networkName · ${totals.active} conn · ↑${rateText(rates.upBps, rateUnit)} ↓${rateText(rates.downBps, rateUnit)}""
+        else "$networkName · ${totals.active} conn · ↑${rateText(rates.upBps, rateUnit)} ↓${rateText(rates.downBps, rateUnit)}"
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_proxy)
             .setContentTitle(title)
