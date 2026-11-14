@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dataproxy-build-${ github.ref }}
+  group: dataproxy-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -30,9 +30,9 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
             ~/gradle-8.10.2
-          key: gradle-${ runner.os }}-8.10.2-${ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-8.10.2-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
-            gradle-${ runner.os }}-8.10.2-
+            gradle-${{ runner.os }}-8.10.2-
 
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
