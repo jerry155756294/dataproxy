@@ -14,6 +14,8 @@ class HttpProxyProtocolTest {
         assertEquals("example.org", req.target.host)
         assertEquals(443, req.target.port)
         assertEquals("2001:db8::1", HttpProxyProtocol.parseAuthority("[2001:db8::1]:443", true).host)
+        assertEquals("127.0.0.1", HttpProxyProtocol.parseAuthority("127.0.0.1:80", true).host)
+        assertBad(400) { HttpProxyProtocol.parseAuthority("2001:db8::1:443", true) }
     }
 
     @Test fun normalizeAbsoluteRequest() {

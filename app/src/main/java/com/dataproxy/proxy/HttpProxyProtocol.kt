@@ -94,11 +94,23 @@ internal object HttpProxyProtocol {
         if (authority.isBlank() || authority.any { it <= ' ' || it == '@' || it == '%' || it == '/' || it == '?' || it == '#' })
             throw BadRequest(400, "Bad Request")
         val colon = authority.lastIndexOf(':')
-        if (colon <= 0 || colon == authority.lastIndex ||
-            (authority.contains(':') && !authority.startsWith("[")) ||
-            (authority.startsWith("[") && authority.getOrNull(colon - 1) != ']'))
+        if (colon <= 0 || colon == authority.lastIndex)
             throw BadRequest(400, "Bad Request")
-        val host = authority.substring(0, colon).removeSurrounding("[", "]")
+        val rawHost = authority.substring(0, colon)
+        val host = if (rawHost.startsWith("[")) {
+            // CONNECT IPv6 literals must use [IPv6]:port (RFC 3986).
+            if (!rawHost.endsWith("]") || rawHost.length < 4 ||
+                rawHost.substring(1, rawHost.length - 1).contains('[') ||
+                !rawHost.contains(':'))
+                throw BadRequest(400, "Bad Request")
+            rawHost.substring(1, rawHost.length - 1)
+        } else {
+            // A single colon separates host and port for DNS names and IPv4.
+            // Unbracketed IPv6 is ambiguous and must be rejected.
+            if (rawHost.any { it == ':' || it == '[' || it == ']' })
+                throw BadRequest(400, "Bad Request")
+            rawHost
+        }
         val port = authority.substring(colon + 1).toIntOrNull()
             ?: throw BadRequest(400, "Bad Request")
         if (port !in 1..65535 || host.isBlank() || host.contains('[') || host.contains(']'))
